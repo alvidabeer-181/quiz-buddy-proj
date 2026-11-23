@@ -1,81 +1,64 @@
 #include <stdio.h>
 
-/* Global arrays: each student has an ID and a name. */
 int ids[100];
 char names[100][64];
 int students = 0;
-char subjects[3][30] = {"Programming", "Mathematics", "Computer Basics"};
 
-/* Read a number and remove the rest of the input line. */
+char subjects[3][30] = {
+    "Programming", "Mathematics", "Computer Basics"
+};
+
+/* Each student's total, attempts and highest score per subject */
+int totals[100][3] = {0};
+int attempts[100][3] = {0};
+int highest[100][3] = {0};
+
 int inputNumber()
 {
     int n, ok, ch;
+
     ok = scanf("%d", &n);
+
     ch = getchar();
     while (ch != '\n' && ch != EOF)
         ch = getchar();
+
     if (ok == EOF)
         return -1;
+
     if (ok != 1)
         return -2;
+
     return n;
-}
-
-void loadStudents()
-{
-    FILE *file;
-    file = fopen("students.txt", "r");
-    if (file == NULL)
-        return;
-
-    while (students < 100)
-    {
-        if (fscanf(file, "%d %63[^\n]", &ids[students], names[students]) != 2)
-            break;
-        students++;
-    }
-    fclose(file);
 }
 
 void addStudent()
 {
-    FILE *file;
-    int i, ch;
+    int ch;
+
     if (students == 100)
     {
         printf("Only 100 students can register.\n");
         return;
     }
+
     printf("Enter your name: ");
+
     if (scanf(" %63[^\n]", names[students]) != 1)
         return;
+
     ch = getchar();
     while (ch != '\n' && ch != EOF)
         ch = getchar();
 
-    ids[students] = 1;
-    for (i = 0; i < students; i++)
-    {
-        if (ids[i] >= ids[students])
-            ids[students] = ids[i] + 1;
-    }
-    file = fopen("students.txt", "a");
-    if (file == NULL)
-    {
-        printf("Could not save student.\n");
-        return;
-    }
-    i = fprintf(file, "%d %s\n", ids[students], names[students]);
-    if (fclose(file) != 0 || i < 0)
-    {
-        printf("Could not save student.\n");
-        return;
-    }
+    ids[students] = students + 1;
+
     printf("Registered! Your ID is %d\n", ids[students]);
+
     students++;
 }
 
-void takeQuiz(int id)
+void takeQuiz(int student)
 {
     char questions[3][5][200] = {
         {
@@ -100,119 +83,144 @@ void takeQuiz(int id)
             "Which is an operating system?\n1. CPU\n2. Windows\n3. RAM\n4. USB"
         }
     };
-    int answers[3][5] = {{2,1,3,4,2}, {2,1,3,4,2}, {2,1,3,4,2}};
-    int subject, answer, score = 0, i, saved;
-    FILE *file;
 
-    printf("1. Programming\n2. Mathematics\n3. Computer Basics\nChoose subject: ");
+    int answers[3][5] = {
+        {2, 1, 3, 4, 2},
+        {2, 1, 3, 4, 2},
+        {2, 1, 3, 4, 2}
+    };
+
+    int subject, answer, score = 0, i;
+
+    printf("\n1. Programming\n");
+    printf("2. Mathematics\n");
+    printf("3. Computer Basics\n");
+    printf("Choose subject: ");
+
     subject = inputNumber();
+
     if (subject < 1 || subject > 3)
     {
         printf("Invalid subject.\n");
         return;
     }
+
     subject--;
+
     for (i = 0; i < 5; i++)
     {
-        printf("\nQuestion %d\n%s\nAnswer (1-4, 0 to cancel): ", i + 1, questions[subject][i]);
+        printf("\nQuestion %d\n", i + 1);
+        printf("%s\n", questions[subject][i]);
+        printf("Answer (1-4, 0 to cancel): ");
+
         answer = inputNumber();
-        while (answer != -1 && answer != 0 && (answer < 1 || answer > 4))
+
+        while (answer != -1 && answer != 0 &&
+               (answer < 1 || answer > 4))
         {
             printf("Enter 1-4, or 0 to cancel: ");
             answer = inputNumber();
         }
+
         if (answer == 0 || answer == -1)
         {
             printf("Quiz cancelled.\n");
             return;
         }
+
         if (answer == answers[subject][i])
         {
             score++;
             printf("Correct!\n");
         }
         else
-            printf("Wrong. Correct option: %d\n", answers[subject][i]);
+        {
+            printf("Wrong. Correct option: %d\n",
+                   answers[subject][i]);
+        }
     }
-    printf("\nScore: %d/5\nPercentage: %d%%\n", score, score * 20);
-    file = fopen("scores.txt", "a");
-    if (file == NULL)
-    {
-        printf("Could not save score.\n");
-        return;
-    }
-    saved = fprintf(file, "%d %d %d\n", id, subject, score);
-    if (fclose(file) != 0 || saved < 0)
-        printf("Could not save score.\n");
-    else
-        printf("Score saved.\n");
+
+    printf("\nScore: %d/5\n", score);
+    printf("Percentage: %d%%\n", score * 20);
+
+    /* Update progress only after completing the quiz */
+    totals[student][subject] += score;
+    attempts[student][subject]++;
+
+    if (score > highest[student][subject])
+        highest[student][subject] = score;
 }
 
-void showProgress(int id)
+void showProgress(int student)
 {
-    FILE *file;
-    int studentId, subject, score, i;
-    int total[3] = {0,0,0};
-    int count[3] = {0,0,0};
-    int highest[3] = {0,0,0};
-    int allTotal = 0, allCount = 0, best = 0;
+    int i;
+    int allTotal = 0;
+    int allAttempts = 0;
+    int best = 0;
     float average;
-    file = fopen("scores.txt", "r");
-    if (file == NULL)
-    {
-        printf("No saved scores available.\n");
-        return;
-    }
-    printf("\nPrevious results:\n");
-    while (fscanf(file, "%d %d %d", &studentId, &subject, &score) == 3)
-    {
-        if (studentId == id && subject >= 0 && subject < 3 && score >= 0 && score <= 5)
-        {
-            printf("%s: %d/5 (%d%%)\n", subjects[subject], score, score * 20);
-            total[subject] += score;
-            count[subject]++;
-            if (score > highest[subject])
-                highest[subject] = score;
-            allTotal += score;
-            allCount++;
-            if (score > best)
-                best = score;
-        }
-    }
-    fclose(file);
-    if (allCount == 0)
-    {
-        printf("This student has no quiz results yet.\n");
-        return;
-    }
+
+    printf("\nProgress for %s\n", names[student]);
+
     for (i = 0; i < 3; i++)
     {
-        if (count[i] == 0)
+        if (attempts[student][i] == 0)
+        {
             printf("\n%s: not attempted\n", subjects[i]);
+        }
         else
         {
-            average = total[i] * 20.0f / count[i];
-            printf("\n%s: %d attempts\nAverage: %.1f%%\nHighest: %d%%\n",
-                   subjects[i], count[i], average, highest[i] * 20);
+            average = totals[student][i] * 20.0f /
+                      attempts[student][i];
+
+            printf("\nSubject: %s\n", subjects[i]);
+            printf("Attempts: %d\n", attempts[student][i]);
+            printf("Average: %.1f%%\n", average);
+            printf("Highest: %d%%\n", highest[student][i] * 20);
+
             if (average < 60)
                 printf("You should practice this subject more.\n");
+
+            allTotal += totals[student][i];
+            allAttempts += attempts[student][i];
+
+            if (highest[student][i] > best)
+                best = highest[student][i];
         }
     }
-    printf("\nOverall average: %.1f%%\nOverall highest: %d%%\n",
-           allTotal * 20.0f / allCount, best * 20);
+
+    if (allAttempts == 0)
+    {
+        printf("\nNo quiz results yet.\n");
+    }
+    else
+    {
+        average = allTotal * 20.0f / allAttempts;
+
+        printf("\nOverall average: %.1f%%\n", average);
+        printf("Overall highest: %d%%\n", best * 20);
+    }
 }
 
 int main()
 {
     int choice, id, found, i, menu;
-    loadStudents();
+
     printf("STUDY BUDDY\n");
+    printf("Students and scores reset when you close the program.\n");
+
     do
     {
-        printf("\n1. Register student\n2. Select student\n0. Exit\nChoice: ");
+        printf("\n1. Register student\n");
+        printf("2. Select student\n");
+        printf("0. Exit\n");
+        printf("Choice: ");
+
         choice = inputNumber();
+
         if (choice == 1)
+        {
             addStudent();
+        }
         else if (choice == 2)
         {
             if (students == 0)
@@ -220,36 +228,58 @@ int main()
                 printf("Register a student first.\n");
                 continue;
             }
+
             for (i = 0; i < students; i++)
                 printf("ID %d: %s\n", ids[i], names[i]);
+
             printf("Enter your ID: ");
             id = inputNumber();
+
             found = -1;
+
             for (i = 0; i < students; i++)
+            {
                 if (ids[i] == id)
                     found = i;
+            }
+
             if (found == -1)
+            {
                 printf("ID not found.\n");
+            }
             else
             {
                 do
                 {
-                    printf("\nHello %s\n1. Take quiz\n2. History and progress\n0. Back\nChoice: ", names[found]);
+                    printf("\nHello %s\n", names[found]);
+                    printf("1. Take quiz\n");
+                    printf("2. View progress\n");
+                    printf("0. Back\n");
+                    printf("Choice: ");
+
                     menu = inputNumber();
+
                     if (menu == 1)
-                        takeQuiz(id);
+                        takeQuiz(found);
                     else if (menu == 2)
-                        showProgress(id);
+                        showProgress(found);
                     else if (menu != 0 && menu != -1)
                         printf("Invalid choice.\n");
+
                 } while (menu != 0 && menu != -1);
+
                 if (menu == -1)
                     break;
             }
         }
         else if (choice != 0 && choice != -1)
+        {
             printf("Invalid choice.\n");
+        }
+
     } while (choice != 0 && choice != -1);
+
     printf("Goodbye!\n");
+
     return 0;
 }
