@@ -161,7 +161,6 @@ int main()
 {
     int choice, id, found, i, menu;
     printf("STUDY BUDDY\n");
-    printf("Students and scores reset when you close the program.\n");
     do
     {
         printf("\n1. Register student\n");
